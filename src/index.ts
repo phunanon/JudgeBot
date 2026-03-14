@@ -568,7 +568,7 @@ async function handleProsecute(
   const punishment = caseRecord.judgement.punishment;
   const casesChannel = await getGuildChannel(interaction.guild);
 
-  const reason = `JudgeBot case #${caseRecord.id}: ${caseRecord.judgement.summary}`;
+  const reason = `JudgeBot case #${caseRecord.id}: ${caseRecord.caseMessageUrl}`;
 
   if (punishment === Punishment.BAN) {
     // await interaction.guild.members.ban(caseRecord.subjectSnowflakeId, {
@@ -588,8 +588,7 @@ async function handleProsecute(
     }
 
     if (punishment === Punishment.KICK) {
-      // await targetMember.kick(reason);
-      console.log('I would have kicked', caseRecord.subjectSf, reason);
+      await targetMember.kick(reason);
     } else {
       await targetMember.timeout(8 * 60 * 60_000, reason);
     }
@@ -602,7 +601,7 @@ async function handleProsecute(
   if (casesChannel) {
     await casesChannel
       .send(
-        `${caseRecord.judgement.messageUrl} prosecuted by <@${interaction.user.id}>`,
+        `<@${caseRecord.subjectSf}> prosecuted by <@${interaction.user.id}> ${caseRecord.judgement.messageUrl}`,
       )
       .catch(e => console.error(e));
   }
