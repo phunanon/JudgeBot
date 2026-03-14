@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum AttachmentModerationStatus {
+  PENDING
+  CLEAN
+  IMPROPER
+}
+
+enum Punishment {
+  BAN
+  KICK
+  MUTE
+  NONE
+}
+
+model Guild {
+  id             Int      @id @default(autoincrement())
+  sf             String   @unique
+  casesChannelSf String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  cases Case[]
+}
+
+model Case {
+  id             Int      @id @default(autoincrement())
+  guildId        Int
+  subjectSf      String
+  caseMessageUrl String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  guild     Guild      @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  evidence  Evidence[]
+  judgement Judgement?
+
+  @@index([guildId, subjectSf])
+}
+
+model Judgement {
+  id         Int        @id @default(autoincrement())
+  caseId     Int        @unique
+  messageUrl String
+  summary    String
+  punishment Punishment
+  judgedAt   DateTime   @default(now())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model Evidence {
+  id               Int      @id @default(autoincrement())
+  createdAt        DateTime @default(now())
+  caseId           Int
+  messageSf        String
+  channelSf        String
+  messageUrl       String
+  authorSf         String
+  collectorSf      String
+  content          String
+  hadAttachments   Boolean  @default(false)
+  replySummary     String?
+  messageCreatedAt DateTime
+
+  case        Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  attachments EvidenceAttachment[]
+
+  @@unique([caseId, messageSf])
+}
+
+model EvidenceAttachment {
+  id               Int                        @id @default(autoincrement())
+  evidenceId       Int
+  url              String
+  moderationStatus AttachmentModerationStatus @default(PENDING)
+  moderationRaw    String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([evidenceId])
+}
