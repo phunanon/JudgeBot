@@ -171,7 +171,7 @@ async function IsTextImproper(content: string) {
   });
 
   return moderation.results.some(result =>
-    Object.values(result.category_scores).some(score => score > 0.5),
+    Object.values(result.category_scores).some(score => score > 0.2),
   );
 }
 

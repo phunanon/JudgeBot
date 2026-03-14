@@ -236,9 +236,7 @@ async function handleUseAsEvidence(
       caseId: openCase.id,
       messageSf: { in: messageSfs },
     },
-    include: {
-      attachments: { select: { url: true } },
-    },
+    include: { attachments: { select: { url: true } } },
   });
 
   const existingMessageIds = new Set(
@@ -453,8 +451,8 @@ async function handleMakeJudgement(
       );
       return;
     }
-
-    const judgement = await generateJudgement(buildEvidenceList(dbCase, false));
+    const evidenceList = buildEvidenceList(dbCase, false, 8_000);
+    const judgement = await generateJudgement(evidenceList);
 
     const channel = await getGuildChannel(interaction.guild);
 
@@ -721,15 +719,17 @@ async function collectEvidenceMessages(
 
   return Promise.all(
     contextMessages.map(async message => {
+      const content = truncate(
+        stringOrFallback(message.content, '*No text content*'),
+        256,
+      );
       return {
         messageSf: message.id,
         channelSf: message.channelId,
         messageUrl: message.url,
         authorSf: message.author.id,
         collectorSf,
-        content: truncateEvidenceMessage(
-          stringOrFallback(message.content, '*No text content*'),
-        ),
+        content,
         hadAttachments: message.attachments.size > 0,
         replySummary: await getReplyContext(message),
         messageCreatedAt: message.createdAt,
@@ -763,7 +763,7 @@ async function getReplyContext(message: D.Message): Promise<string | null> {
 function buildEvidenceList(
   caseRecord: CaseWithEvidence,
   withMetadata: boolean,
-  maxLength = 8_000,
+  maxLength: number,
 ): string {
   const lines: string[] = [];
 
@@ -823,7 +823,7 @@ function buildEvidenceList(
           ? ' [has attachment]'
           : '';
       lines.push(
-        `${speakerLabels[message.authorSf] ?? '[Person]'}${attachmentContext}: ${truncateEvidenceMessage(message.content)}`,
+        `${speakerLabels[message.authorSf] ?? '[Person]'}${attachmentContext}: ${message.content}`,
       );
 
       if (message.replySummary) {
@@ -933,17 +933,11 @@ function stringOrFallback(value: string, fallback: string): string {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-function truncateEvidenceMessage(value: string): string {
-  const max = 256;
-  return value.length <= max ? value : value.slice(0, max) + '...';
-}
-
-function truncate(value: string, maxLength: number): string {
+function truncate(value: string, maxLength: number) {
   if (value.length <= maxLength) {
     return value;
   }
-
-  return `${value.slice(0, Math.max(0, maxLength - 20)).trimEnd()}\n... (truncated)`;
+  return `${value.slice(0, Math.max(0, maxLength - 20)).trimEnd()}... (truncated)`;
 }
 
 function getErrorMessage(error: unknown): string {
