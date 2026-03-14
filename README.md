@@ -1,22 +1,18 @@
 # JudgeBot
 
-Discord moderation bot built with `discord.js`, TypeScript, Prisma 7, SQLite, and the OpenAI Node SDK.
+Discord moderation workflow bot using `discord.js`, TypeScript, Prisma + SQLite, and OpenAI.
 
-## Setup
+## Overview
 
-1. Fill in [.env](.env).
-2. Run `pnpm db:migrate`.
+- `/cases-here` sets the server's cases channel.
+- `Use as evidence` captures the selected message plus nearby context, deduplicates evidence, and opens/reuses an active case.
+- Cases support `View evidence`, `Make judgement`, `Prosecute`, and `Clean up inappropriate messages` actions.
+- Attachments and message text are moderated with `omni-moderation-latest`.
+- Judgements are generated with `gpt-5-nano` and include a summary plus punishment recommendation (`BAN`, `KICK`, `MUTE`, `NONE`).
+
+## Quick start
+
+1. Create `.env` with `DISCORD_TOKEN` and `OPENAI_API_KEY`.
+2. Run `pnpm migrate`.
 3. Run `pnpm build`.
-4. Start the bot with `pnpm start`.
-
-## Features
-
-- `/cases-here` stores the current channel as the cases channel for the guild.
-- Message context menu command: `Use as evidence`.
-- Evidence is deduplicated per Discord message.
-- Open cases are created automatically per accused user.
-- Case messages provide a `View evidence` button.
-- Evidence review provides a `Make judgement` button.
-- Attachment URLs are checked with `omni-moderation-latest` before judgement.
-- Judgements are generated with `gpt-5-nano` and posted back into the cases channel.
-- Judgements can recommend a prosecution action: mute, kick, or ban.
+4. Run `pnpm start`.
