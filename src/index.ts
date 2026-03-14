@@ -31,6 +31,7 @@ const caseWithEvidenceArgs = Prisma.validator<Prisma.CaseDefaultArgs>()({
 
 type CaseWithEvidence = Prisma.CaseGetPayload<typeof caseWithEvidenceArgs>;
 type ActionablePunishment = Exclude<Punishment, 'NONE'>;
+
 type CollectedEvidenceMessage = {
   messageSf: string;
   channelSf: string;
@@ -727,7 +728,9 @@ async function collectEvidenceMessages(
         messageUrl: message.url,
         authorSf: message.author.id,
         collectorSf,
-        content: stringOrFallback(message.content, '*No text content*'),
+        content: truncateEvidenceMessage(
+          stringOrFallback(message.content, '*No text content*'),
+        ),
         hadAttachments: message.attachments.size > 0,
         replySummary: await getReplyContext(message),
         messageCreatedAt: message.createdAt,
@@ -821,7 +824,7 @@ function buildEvidenceList(
           ? ' [has attachment]'
           : '';
       lines.push(
-        `${speakerLabels[message.authorSf] ?? '[Person]'}${attachmentContext}: ${message.content}`,
+        `${speakerLabels[message.authorSf] ?? '[Person]'}${attachmentContext}: ${truncateEvidenceMessage(message.content)}`,
       );
 
       if (message.replySummary) {
@@ -929,6 +932,11 @@ function isGuildTextChannel(
 function stringOrFallback(value: string, fallback: string): string {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function truncateEvidenceMessage(value: string): string {
+  const max = 256;
+  return value.length <= max ? value : value.slice(0, max) + '...';
 }
 
 function truncate(value: string, maxLength: number): string {

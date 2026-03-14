@@ -16,3 +16,4 @@ Discord moderation workflow bot using `discord.js`, TypeScript, Prisma + SQLite,
 2. Run `pnpm migrate`.
 3. Run `pnpm build`.
 4. Run `pnpm start`.
+5. Optionally run `pm2 start --name JudgeBot pnpm -- start`
