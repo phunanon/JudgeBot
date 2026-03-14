@@ -719,15 +719,16 @@ async function collectEvidenceMessages(
 
   return Promise.all(
     contextMessages.map(async message => {
+      const authorSf = message.author.id;
       const content = truncate(
         stringOrFallback(message.content, '*No text content*'),
-        256,
+        authorSf === targetMessage.author.id ? 512 : 128,
       );
       return {
         messageSf: message.id,
         channelSf: message.channelId,
         messageUrl: message.url,
-        authorSf: message.author.id,
+        authorSf,
         collectorSf,
         content,
         hadAttachments: message.attachments.size > 0,
@@ -934,10 +935,8 @@ function stringOrFallback(value: string, fallback: string): string {
 }
 
 function truncate(value: string, maxLength: number) {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, Math.max(0, maxLength - 20)).trimEnd()}... (truncated)`;
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 20)).trimEnd()}… (truncated)`;
 }
 
 function getErrorMessage(error: unknown): string {
