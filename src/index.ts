@@ -467,20 +467,28 @@ async function handleMakeJudgement(
       judgement.punishment === 'NONE'
         ? 'No action recommended'
         : judgement.punishment;
-    const content = `:judge: ${punishment}
-**Judgement for case #${dbCase.id} against <@${dbCase.subjectSf}>** ${dbCase.caseMessageUrl}
-> ${judgement.summary}`;
+    const content = `:judge: ${punishment} **Case #${dbCase.id} against <@${dbCase.subjectSf}>** ${dbCase.caseMessageUrl}`;
     const components =
       judgement.punishment !== Punishment.NONE
         ? [buildProsecuteRow(dbCase.id, judgement.punishment)]
         : [];
-    const judgementMessage = await channel.send({ content, components });
+    const summary = `Prosecution:
+${judgement.prosecution}
+Defence:
+${judgement.defence}
+Judge:
+${judgement.judgement}`;
+    const summaryTxt = new D.AttachmentBuilder(Buffer.from(summary)).setName(
+      `case_${dbCase.id}.txt`,
+    );
+    const files = [summaryTxt];
+    const judgementMessage = await channel.send({ content, components, files });
 
     await prisma.judgement.create({
       data: {
         caseId: dbCase.id,
         messageUrl: judgementMessage.url,
-        summary: judgement.summary,
+        summary: content,
         punishment: judgement.punishment,
         judgedAt: new Date(),
       },
@@ -529,6 +537,18 @@ async function handleProsecute(
 
   await interaction.deferReply({ flags: [D.MessageFlags.Ephemeral] });
 
+/*
+  const actor = await interaction.guild.members.fetch(interaction.user.id);
+  const botMember = await interaction.guild.members.fetchMe();
+
+  if (!memberOutranksBot(actor, botMember, interaction.guild.ownerId)) {
+    await interaction.editReply(
+      'Only members with a higher server position than the bot can prosecute a case.',
+    );
+    return;
+  }
+*/
+
   const caseRecord = await prisma.case.findUnique({
     where: { id: caseId },
     include: { judgement: true },
@@ -552,7 +572,7 @@ async function handleProsecute(
   const punishment = caseRecord.judgement.punishment;
   const casesChannel = await getGuildChannel(interaction.guild);
 
-  const reason = `JudgeBot case #${caseRecord.id}: ${caseRecord.caseMessageUrl}`;
+  const reason = `case #${caseRecord.id}: ${caseRecord.caseMessageUrl}`;
 
   if (punishment === Punishment.BAN) {
     await interaction.guild.members.ban(caseRecord.subjectSf, { reason });
@@ -582,7 +602,7 @@ async function handleProsecute(
   if (casesChannel) {
     await casesChannel
       .send(
-        `<@${caseRecord.subjectSf}> prosecuted by <@${interaction.user.id}> ${caseRecord.judgement.messageUrl}`,
+        `<@${caseRecord.subjectSf}> prosecuted (${caseRecord.judgement.punishment}) by <@${interaction.user.id}> ${caseRecord.judgement.messageUrl}`,
       )
       .catch(e => console.error(e));
   }
@@ -802,7 +822,7 @@ function buildEvidenceList(
         attachment =>
           attachment.moderationStatus === AttachmentModerationStatus.IMPROPER,
       )
-        ? ' [includes attachment deemed inappropriate]'
+        ? ' [includes attachment deemed grossly inappropriate]'
         : message.hadAttachments
           ? ' [has attachment]'
           : '';
@@ -831,7 +851,7 @@ function createSpeakerLabels(
     [...new Set(authorSfs)].map((authorSf, index) => [
       authorSf,
       authorSf === subjectSf
-        ? '[Subject]'
+        ? '[SUBJECT]'
         : `[Person ${String.fromCharCode(65 + indexForNonSubject(authorSfs, subjectSf, authorSf))}]`,
     ]),
   );

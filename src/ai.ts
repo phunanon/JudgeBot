@@ -2,12 +2,25 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 
 import { config } from './config.js';
+import { zodResponseFormat } from 'openai/helpers/zod.js';
 
 const judgementSchema = z.object({
-  summary: z.string().min(1),
+  prosecution: z
+    .string()
+    .min(1)
+    .describe("The prosecution's argument considering the evidence and rules."),
+  defence: z
+    .string()
+    .min(1)
+    .describe("The defence's argument considering the evidence and rules."),
+  judgement: z
+    .string()
+    .min(1)
+    .describe(
+      "Weighing the evidence, prosecution's arguments, and defence's arguments, an executive judgement summary of the case.",
+    ),
   punishment: z.enum(['BAN', 'KICK', 'MUTE', 'NONE']),
 });
-
 export type JudgementResult = z.infer<typeof judgementSchema>;
 
 export type AttachmentModerationResult = {
@@ -15,9 +28,7 @@ export type AttachmentModerationResult = {
   raw: string;
 };
 
-export const openai = new OpenAI({
-  apiKey: config.openAiApiKey,
-});
+export const openai = new OpenAI({ apiKey: config.openAiApiKey });
 
 export async function moderateAttachment(
   url: string,
@@ -39,54 +50,46 @@ export async function moderateAttachment(
 export async function generateJudgement(
   evidenceReport: string,
 ): Promise<JudgementResult> {
-  const response = await openai.responses.create({
-    model: 'gpt-5-nano',
-    reasoning: { effort: 'minimal' },
-    input: [
+  const response = await openai.chat.completions.parse({
+    model: 'gpt-5-mini',
+    reasoning_effort: 'low',
+    messages: [
       {
         role: 'system',
         content: [
           {
-            type: 'input_text',
-            text: 'You are a moderation assistant. Review the evidence and make an executive judgement about what should happen to [Subject].',
+            type: 'text',
+            text: `Your honours. The following evidence is brought to your attention from a Discord server.
+
+This server has these rules:
+- Respect others: No hate speech, slurs, harassment, doxing, impersonation, or shaming.
+- Keep it clean: No threatening language, and no adult themes.
+- No spam, ads, or solicitation: Don't flood chats with messages/media. No advertisements, and no begging for e.g. money or Nitro. Advertisement exceptions: your own music in ⁠#music; your own games in ⁠#games; your own art in #⁠your-art-pics-and-pets.
+- No trolling or inciting drama: Keep interactions constructive.
+
+Punishments:
+- BAN: User is banned from the server permanently.
+- KICK: User is kicked from the server, but can rejoin.
+- MUTE: User can read messages but cannot send messages for eight hours - a severe warning.
+- NONE: No action is taken against the user.
+
+Consider that the removal of mildly controversial members can negatively impact the community, as they might be contributing positively in other ways. Therefore, if the evidence is not clear-cut, it is better to opt for no punishment at all.
+People are free to speak their minds, and we should be cautious about over-moderation. If the evidence is ambiguous, it's often best to err on the side of leniency, as another case can always be opened with stronger evidence.
+
+We shall now discuss the evidence. Judgement will only affect [SUBJECT] - if there is bad behaviour by others, this will be dealt with in a separate case.`,
           },
         ],
       },
-      {
-        role: 'user',
-        content: [{ type: 'input_text', text: evidenceReport }],
-      },
+      { role: 'user', content: [{ type: 'text', text: evidenceReport }] },
     ],
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'judgement',
-        strict: true,
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            summary: {
-              type: 'string',
-              description: 'A brief judgement summary for moderators.',
-            },
-            punishment: {
-              type: 'string',
-              enum: ['BAN', 'KICK', 'MUTE', 'NONE'],
-              description: 'The recommended punishment to apply. Mutes are for 8 hours.',
-            },
-          },
-          required: ['summary', 'punishment'],
-        },
-      },
-    },
+    response_format: zodResponseFormat(judgementSchema, 'judgement'),
   });
 
-  const outputText = response.output_text?.trim();
+  const parsed = response.choices[0]?.message.parsed;
 
-  if (!outputText) {
+  if (!parsed) {
     throw new Error('OpenAI did not return a judgement payload.');
   }
 
-  return judgementSchema.parse(JSON.parse(outputText));
+  return parsed;
 }
