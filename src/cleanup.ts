@@ -7,10 +7,6 @@ import { prisma } from './db.js';
 const noTextFallback = '*No text content*';
 const activeCleanups = new Set<number>();
 
-type TextModerationResult = {
-  status: 'CLEAN' | 'IMPROPER';
-};
-
 export function buildCleanupRow(
   caseId: number,
 ): D.ActionRowBuilder<D.ButtonBuilder> {
@@ -125,11 +121,19 @@ async function TryCleanup(interaction: D.ButtonInteraction, caseId: number) {
     failedDeleteCount += 1;
   }
 
-  const summary = [
-    `Messages: deleted ${deletedCount}, missing ${alreadyMissingCount}, failed ${failedDeleteCount}, kept ${keptCount}.`,
-    `Flagged by: text ${textFlaggedCount}, attachment ${attachmentFlaggedCount}.`,
-  ];
-  await interaction.editReply(summary.join('\n')).catch(e => console.error(e));
+  const messageParts: string[] = [];
+  if (deletedCount) messageParts.push(`${deletedCount}x deleted`);
+  if (alreadyMissingCount) messageParts.push(`${alreadyMissingCount}x missing`);
+  if (failedDeleteCount) messageParts.push(`${failedDeleteCount}x failed`);
+  if (keptCount) messageParts.push(`${keptCount}x kept`);
+
+  const flaggedParts: string[] = [];
+  if (textFlaggedCount) flaggedParts.push(`${textFlaggedCount}x text`);
+  if (attachmentFlaggedCount)
+    flaggedParts.push(`${attachmentFlaggedCount}x attachment`);
+
+  const summary = `Messages: ${messageParts.join(', ')}; flagged by: ${flaggedParts.join(', ')}`;
+  await interaction.editReply(summary).catch(e => console.error(e));
 }
 
 type Attachment = {

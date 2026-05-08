@@ -529,23 +529,9 @@ async function handleProsecute(
 
   await interaction.deferReply({ flags: [D.MessageFlags.Ephemeral] });
 
-  const actor = await interaction.guild.members.fetch(interaction.user.id);
-  const botMember = await interaction.guild.members.fetchMe();
-
-  if (!memberOutranksBot(actor, botMember, interaction.guild.ownerId)) {
-    await interaction.editReply(
-      'Only members with a higher server position than the bot can prosecute a case.',
-    );
-    return;
-  }
-
   const caseRecord = await prisma.case.findUnique({
-    where: {
-      id: caseId,
-    },
-    include: {
-      judgement: true,
-    },
+    where: { id: caseId },
+    include: { judgement: true },
   });
 
   if (!caseRecord) {
@@ -569,10 +555,7 @@ async function handleProsecute(
   const reason = `JudgeBot case #${caseRecord.id}: ${caseRecord.caseMessageUrl}`;
 
   if (punishment === Punishment.BAN) {
-    // await interaction.guild.members.ban(caseRecord.subjectSnowflakeId, {
-    //   reason,
-    // });
-    console.log('I would have banned', caseRecord.subjectSf, reason);
+    await interaction.guild.members.ban(caseRecord.subjectSf, { reason });
   } else {
     const targetMember = await interaction.guild.members
       .fetch(caseRecord.subjectSf)
