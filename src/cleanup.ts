@@ -164,7 +164,7 @@ async function IsAttachmentImproper(attachments: Attachment[]) {
   }
 }
 
-async function IsTextImproper(content: string) {
+export async function IsTextImproper(content: string) {
   const trimmed = content.trim();
 
   if (!trimmed || trimmed === noTextFallback) return false;

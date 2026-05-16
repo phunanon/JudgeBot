@@ -2,7 +2,7 @@ import * as D from 'discord.js';
 import { AttachmentModerationStatus, Prisma, Punishment } from '@prisma/client';
 
 import { generateJudgement, moderateAttachment } from './ai.js';
-import { buildCleanupRow, handleCleanup } from './cleanup.js';
+import { buildCleanupRow, handleCleanup, IsTextImproper } from './cleanup.js';
 import { config } from './config.js';
 import { prisma } from './db.js';
 
@@ -190,8 +190,25 @@ async function handleUseAsEvidence(
     });
 
   if (!targetMember) {
+    const isInappropriate = await (async () => {
+      if (targetMessage.content.trim().length > 0) {
+        const improper = await IsTextImproper(targetMessage.content);
+        if (improper) return true;
+      }
+      for (const attachment of targetMessage.attachments.values()) {
+        const moderation = await moderateAttachment(attachment.url);
+        if (moderation.status !== 'CLEAN') return true;
+      }
+    })();
+
+    if (isInappropriate) {
+      void targetMessage.delete().catch(e => console.error(e));
+    }
+    const caveat = isInappropriate
+      ? ' however, their message was still hopefully deleted due to being inappropriate.'
+      : ' and their message was not inappropriate enough to be immediately deleted.';
     await interaction.editReply(
-      'The author of that message is not available in the server.',
+      `The author of that message is not available in the server, ${caveat}`,
     );
     return;
   }
@@ -537,7 +554,7 @@ async function handleProsecute(
 
   await interaction.deferReply({ flags: [D.MessageFlags.Ephemeral] });
 
-/*
+  /*
   const actor = await interaction.guild.members.fetch(interaction.user.id);
   const botMember = await interaction.guild.members.fetchMe();
 
@@ -818,10 +835,10 @@ function buildEvidenceList(
     lines.push(`**EXHIBIT ${exhibitId}**`);
 
     for (const message of evidence) {
-      const attachmentContext = message.attachments.some(
-        attachment =>
-          attachment.moderationStatus === AttachmentModerationStatus.IMPROPER,
-      )
+      const hasImproperAttachment = message.attachments.some(
+        a => a.moderationStatus === AttachmentModerationStatus.IMPROPER,
+      );
+      const attachmentContext = hasImproperAttachment
         ? ' [includes attachment deemed grossly inappropriate]'
         : message.hadAttachments
           ? ' [has attachment]'
@@ -847,12 +864,14 @@ function createSpeakerLabels(
   authorSfs: string[],
   subjectSf: string,
 ): Record<string, string> {
+  const aOrB = (authorSf: string) =>
+    String.fromCodePoint(
+      65 + indexForNonSubject(authorSfs, subjectSf, authorSf),
+    );
   return Object.fromEntries(
-    [...new Set(authorSfs)].map((authorSf, index) => [
+    [...new Set(authorSfs)].map(authorSf => [
       authorSf,
-      authorSf === subjectSf
-        ? '[SUBJECT]'
-        : `[Person ${String.fromCharCode(65 + indexForNonSubject(authorSfs, subjectSf, authorSf))}]`,
+      authorSf === subjectSf ? '[SUBJECT]' : `[Person ${aOrB(authorSf)}]`,
     ]),
   );
 }
